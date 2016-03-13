@@ -1,0 +1,74 @@
+---
+title: "Método de Lavielle"
+author: "SuelaneGarcia"
+date: "28 de dezembro de 2015"
+output: html_document
+---
+
+Análise do tempo que o animal permanece muito tempo em um local 
+
+Barraquand e Benhamou (2008) propuseram uma abordagem para particionar a trajetória, para identificar os locais onde o animal permanece muito tempo (com base no cálculo do tempo de residência: veja a página de ajuda da função residenceTime ). Uma vez que o tempo de permanência foi calculado para cada internamento, propõem usar o método de Lavielle (1999, 2005) para particionar a trajetória.
+Nós descrevemos este método nesta seção. O método de Lavielle per se nds a melhor segmentação de uma série de tempo, uma vez que ela é construída por segmentos K. Procura-se que a segmentação de uma função de contraste (medindo o contraste entre a série real e o modelo subjacente à série segmentado) é minimizado. Deixe Yi ser o valor do foco variável (por exemplo, a velocidade, o tempo de residência, etc.) no momento i, e n o número de observações....
+
+```{r}
+library (adehabitatLT)
+data(porpoise)
+gus <- porpoise[1]
+
+set.seed(129)
+seri <- c(rnorm(100), rnorm(100, mean=2),  rnorm(100), rnorm(100, mean=-3),  rnorm(100), rnorm(100, mean=2))
+plot(seri, ty="l", xlab="time", ylab="Series")
+```
+
+Nós vamos usar o método Lavielle para ver se podemos identificar os limites utilizados para gerar esta série. Podemos usar o Lavielle função para calcular a matriz de contraste:
+
+```{r}
+(l <- lavielle(seri, Lmin=10, Kmax=20, type="mean"))
+```
+
+Note que indicam que cada segmento deve conter pelo menos 10 observações (Lmin = 10) e que toda a série é construído por, no máximo, 20 segmentos (Kmax = 20). O resultado da função é uma lista de classe "Lavielle" contendo vários resultados, mas o mais interessante aqui é a matriz de contraste. Nós podemos ter um olhar para a diminuição da função de contraste quando o número de K segmentos aumentar, com a função chooseseg:
+
+```{r}
+chooseseg(l)
+```
+
+Esta função devolve: (i) o valor da função de contraste Jk para vários valores de K, (ii) o valor da segunda derivada da função de contraste D para vários valores de K, e (iii) um gráfico que mostra a diminuição de Jk com K.
+A inclinação da função de contraste é fortemente negativo quando K <6, mas há uma quebra acentuada no K = 6. Visualmente, o valor de kopt = 6 parece, portanto, razoável. Além disso, o último valor de K para o qual D> 0:75 é K = 6, que con rms nossa escolha visuais primeiro (a segunda derivada é realmente muito forte para este valor de K). Nós podemos ter um olhar para a melhor segmentação com 6 segmentos com o findpath função:
+
+```{r}
+fp <- findpath(l, 6)
+```
+
+O método Lavielle faz um trabalho muito bom nessa situação ideal. Nota que fp é uma lista contendo os índices do primeiro e últimos observações do série construindo o segmento de:
+```{r}
+fp
+```
+
+Os limites encontrados pelo método são muito próximos dos limites reais aqui. A função Lavielle é uma função genérica que tem um método para objetos da classe "ltraj". Por exemplo, considere novamente a toninha descrita na seção anterior. Iremos realizar uma segmentação deste trajetória com base nas distâncias percorridas pelo animal a partir de um deslocamento para a próxima.
+
+```{r}
+
+plotltr(gus, "dist")
+```
+
+Podemos usar a função Lavielle para particionar essa trajetória em segmentos com velocidade homogênea. A priori, com base num exame visual, não existe razão para esperar que esta série é construída por mais do que 20 segmentos. Nós vamos usar o método Lavielle, com Kmax = 20 e Lmin = 2 (supomos que há pelo menos 2 observações em um segmento):
+
+```{r}
+
+
+lav <- lavielle (gus, Lmin=2, Kmax=20)
+chooseseg(lav)
+```
+
+Há uma clara ruptura na diminuição da função de contraste após K = 4. Além disso, este é também o último valor de K para o qual D> 0:75. Olhe para a segmentação da série de distâncias:
+
+```{r}
+
+kk <- findpath(lav, 4)
+kk
+plot(kk)
+
+```
+
+Note-se que as linhas vermelhas indicam o início de novos segmentos. A função findpath aqui retorna um objeto da classe "ltraj" com uma explosão por segmento:
+

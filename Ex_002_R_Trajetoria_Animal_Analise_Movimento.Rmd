@@ -1,0 +1,109 @@
+---
+title: "Análise de Movimento"
+author: "SuelaneGarcia"
+date: "19 de fevereiro de 2016"
+output: html_document
+---
+```{r}
+## Clean up workspace, set working directory and load required packages
+	rm(list=ls())
+	library(ggplot2)
+	library(movementAnalysis)
+	library(rgdal)
+
+## Import data
+	data("example_data", package="movementAnalysis")
+		
+	# Explore data, remove duplicates
+	str(example_data); head(example_data, 10); 
+	example_data<- unique(example_data)
+
+	plot(example_data$X, example_data$Y, pch= 21, bg= (1 + as.numeric(
+		 example_data$GroupID)), cex= .95)
+
+	
+	
+## Calculate daily trajectories
+	tr<- as.bbtraj(data.frame(x=example_data$X, y=example_data$Y, s2=example_data$StdDev^2),
+			example_data$DateTime, id=example_data$GroupID, burst=example_data$GroupDayNo)
+	rm(example_data)
+		
+	## Compute the utilization distribution over the whole period for each group
+	groupUDs <- utilizationDistribution(tr)
+	x11()
+
+	plot(groupUDs)
+	contour(groupUDs, add=T)
+	
+	
+	## Lists of days and group pairs where encounters may occur
+	movementModels <- c("linear","BBMM")
+	encListFull <- encounterDuration(tr, 100, model=movementModels, byburst=TRUE)
+
+	## Generate a plot containing only the interesting days:
+	## Linear model detects encounters, or BBMM predicts at least 15 minutes
+	encList <- encListFull[encListFull$BBMM >= 900 | encListFull$linear > 0,]
+	
+	# Give the entries better labels
+	rownames(encList) <- sprintf("%s-%s day %s", encList$id1, encList$id2, 
+			substr(encList$burst1,regexpr("_", encList$burst1)+1, nchar(encList$burst1))) # take the part after the "_" for each burst name
+	encList <- encList[order(rownames(encList)),] # Sort by ascending row names
+
+	x11()
+	barplot(encList, col=hcl(c(0,120)), units="hours",
+			main="Daily duration of encounters between groups",
+			xlab="Group IDs and day",
+			ylab="Encounter duration (hours)")
+	
+	
+	## Duração total de encontros para cada par de grupos
+	encMatrix <- encounterDurationById(encListFull)
+	
+	# Create a plot from the encounter matrices
+	x11()
+	barplot(encMatrix, col=hcl(c(0,120)), units="hours",
+			main="Total duration of encounters between groups",
+			xlab="Group IDs", ylab="Encounter duration (hours)")
+
+
+
+## Compute encounters between trajectories for one specific day
+	# extract the bursts for a single day
+	trd <- tr[burst=c('BD_1417', 'NH_1417')]
+	trd
+	
+	## At which times do we evaluate distance and encounter probility?
+	tRange <- as.double(range(unlist(lapply(trd, function(b) { b$date }))))
+	distance.times <- seq(tRange[1], tRange[2], length.out=200)
+	
+	## Plot the probability of encounter using both the BBMM and linear model
+	x11()
+	# pdistance evaluates the CDF of the distance distribution
+	encounter.plot <- qplot(as.POSIXlt(distance.times, origin="1970-01-01"),
+		pdistance(100, trd, distance.times)[1,2,"100",],
+		geom="line", xlab="Time", ylab="Probability of encounter")
+	# Compute when encounters occur according to the linear model
+	encounter.intervals <- encounterIntervals(100, trd)[[1,2]]
+	encounter.intervals
+	if (ncol(encounter.intervals) > 0) {
+		encounter.plot <- encounter.plot + geom_rect(aes(NULL, NULL,
+			xmin=encounter.intervals["start",], xmax=encounter.intervals["end",]),
+			ymin=-Inf, ymax=Inf, fill=grey(0.8))
+	}
+	encounter.plot <- encounter.plot + geom_line() # re-add the line, it was overwritten by the ribbon
+	encounter.plot + theme_bw()
+	
+	x11()
+	## draw distance according to linear model and 5th and 95th percentile for BBMM
+	distance.plot <- qplot(as.POSIXlt(distance.times, origin="1970-01-01"),
+		distance(trd, distance.times)[1,2,], geom="line",
+		xlab="Time", ylab="Distance (meters)")
+	# qdistance computes quantiles for the distance distribution
+	q.distance <- qdistance(c(0.05, 0.95), trd, distance.times)[1,2,,]
+	distance.plot <- distance.plot + geom_ribbon(aes(ymin=q.distance["0.05",],
+		ymax=q.distance["0.95",]), fill=grey(0.8))
+	distance.plot <- distance.plot + geom_line() # re-add the line, it was overwritten by the ribbon
+	distance.plot + theme_bw()
+
+
+```

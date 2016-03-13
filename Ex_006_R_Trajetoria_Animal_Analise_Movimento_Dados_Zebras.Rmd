@@ -1,0 +1,62 @@
+---
+title: "Análise de Movimento com Dados de Zebras"
+author: "SuelaneGarcia"
+date: "19 de fevereiro de 2016"
+output: html_document
+
+## Estudando a análise de movimentos com o pacote MovementAnalysis dados do banco
+---
+```{r}
+## Clean up workspace, set working directory and load required packages
+	rm(list=ls())
+	library(ggplot2)
+	library(movementAnalysis)
+	#library(adehabitat)
+	library(rgdal)
+
+## acessa o banco de dados
+
+library(RMySQL)
+
+conexao <- dbConnect(MySQL(),user="root", db="weka",host="localhost")
+dados <- dbReadTable(conexao, "zebras")
+dataset <- as.data.frame(dados)
+query <- dbSendQuery(conexao, "select timestamp, location_lat, location_long, individual_taxon_canonical_name from VWZebra ")
+
+
+#problema 1: nos dados há data e hora repetida no timestamp por isso foram agrupados os dados 
+
+result_consulta <- fetch(query, n=-1)
+dataset <- result_consulta
+
+# Explore data, remove duplicados
+str(dataset); 
+head(dataset, 10); 
+	
+#dataset<- unique(dataset)
+plot(dataset$location_lat, dataset$location_long, pch= 21, bg= 'blue', cex= .95)
+
+```
+
+
+```{r}
+## Calcular trajetórias diárias
+## bbtraj (dataset, datatime, id, )
+
+da <- as.character(as.Date(dataset$timestamp))
+da <- as.POSIXct(strptime(as.character(dataset$timestamp),"%Y-%m-%d %H:%M"))
+
+tr<- as.bbtraj(data.frame(x=dataset$location_lat, y=dataset$location_long, s2=1), da, id=dataset$individual_taxon_canonical_name, infolocs = dataset[2])
+#rm(dataset)
+
+#tr
+
+## Calcular a distribuição de utilização durante todo o período para cada grupo
+#groupUDs <- utilizationDistribution(tr)
+#x11()
+
+plot(tr)
+##text(dataset[,c("location_lat", "location_long")], as.character(dataset$year))
+
+```
+

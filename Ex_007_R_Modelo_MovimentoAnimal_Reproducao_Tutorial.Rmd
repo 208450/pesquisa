@@ -1,0 +1,279 @@
+---
+title: "Movimento Animal com adehabitatLT - Reprodução do Tutorial "
+author: "SuelaneGarcia"
+date: "30 de dezembro de 2015"
+output: html_document
+---
+
+### Modelo de Movimento de Animais
+O pacote adehabitatLT propõe 6 funções para simular tais modelos:
+- simm.brown:utilizado p/ simular um movimento Browniano;
+- simm.crw: utilizado p/ simular passeios aleatórios correlacionados. Este modelo tem sido muitas vezes usado para descrever os movimentos dos animais;
+- simm.mba: utilizado p/ simular um movimento browniano aritmético (com um parâmetro de desvio e uma covariância entre as coordenadas.
+- simm.bb: utilizado p/ simular um movimento Browniano ponte (ou seja, um movimento browniano constrangida por uma Xed ponto inicial e final);
+- simm.mou: utilizado p/ simular um movimento bivariada Ornstein-Uhlenbeck (muitas vezes usado para descrever o sedentarismo de um animal;
+- simm.levy pode ser utilizado para simular uma Levy andar, como descrito (Bartumeus et al., 2005).
+Todas essas funções retornam um objeto da classe ltraj. Por exemplo, simular um passeio aleatório correlacionados construído por 1000 passos caracterizados por um cosseno média dos ângulos relativos igual a 0,95 e um parâmetro de escala para o comprimento do passo igual a 1:
+
+```{r}
+library(adehabitatLT)
+
+sim <- simm.crw(1:1000, r=0.95)
+sim
+
+```
+
+Note-se que o vetor 1: 1000 passes como um argumento é considerado aqui como um vector de datas (ele é convertido para a classe POSIXct pela função. Outras datas podem ser passadas para as funções. Dê uma olhada na trajetória simulada:
+
+```{r}
+plot(sim, addp=FALSE)
+
+```
+
+
+### Modelos nulos de movimentos dos animais
+#### O que é um modelo nulo?
+O adehabitatLT pacote fornece várias funções para realizar um modelo de análise de trajetórias nulas. 
+Modelos nulos são freqüentemente usados em ecologia de comunidades para testar hipóteses sobre os processos que geraram os dados.
+
+Gotelli e Graves (1996) define o modelo nulo como um modelo de geração de padrões que se baseia na randomização de dados ecológicos ou amostragem aleatória de uma distribuição conhecida ou imaginada. O modelo nulo é projetado com respeito a algum processo ecológico ou evolutivo de interesse. 
+
+Certos elementos dos dados são mantidos constantes, e outros estão autorizados a variar estocasticamente para criar novos padrões de aglutinação. A aleatorização foi concebida para produzir um padrão que seria de esperar na ausência de um mecanismo ecológico especial".
+
+Gotelli (2001) deu origem a uma descrição mais detalhada da abordagem de modelo nulo:
+para construir um modelo nulo, um índice de estrutura da comunidade, tais como a quantidade de sobreposição de nicho (...), é primeira medida para os dados reais. Em seguida, uma comunidade nula é gerada de acordo com um algoritmo ou conjunto de regras para a randomização, e este mesmo índice é medido para a comunidade nula. Um grande número de comunidades nulas são usadas ... para gerar um histograma de frequência de valores de índice esperado se a hipótese nula é verdadeira. A posição do índice observado nas caudas desta distribuição nula é então usado para atribuir um valor de probabilidade para o padrão, tal como em uma análise estatística convencional.
+Embora usado principalmente em ecologia de comunidades, esta abordagem também foi defendida por dados trajetória, por exemplo, na análise de seleção de habitat (Martin et al., 2008) e o estudo das interações entre os animais (Richard et al. 2012).
+
+Esta abordagem pode realmente ser muito útil para testar hipóteses relacionadas aos movimentos de animais. O pacote adehabitatLT propor vários modelos gerais que nulos podem ser usados para testar hipóteses biológicas.
+
+### O problema
+Por exemplo, considere o primeiro animal  no puechcirc  carregado anteriormente. Nós traçamos essa trajetória em um mapa de elevação:
+
+```{r}
+data(puechcirc)
+data(puechabonsp)
+boar1 <- puechcirc[1]
+xo <- coordinates(puechabonsp$map)
+
+## Note that xo is a matrix containing the coordinates of the
+## pixels of the elevation map (we will use it later to define
+## the limits of the study area).
+plot(boar1, spixdf=puechabonsp$map, xlim=range(xo[,1]), ylim=range(xo[,2]))
+
+```
+
+À primeira vista, parece que o animal ocupa uma grande gama de valores de altitude. Podemos querer testar se a variância dos valores de elevação nos deslocamentos animais poderiam ter sido observados sob a hipótese de uso de habitat aleatório. 
+
+A questão é, portanto: o que queremos dizer por uso de habitat aleatório "Podemos considerar o animal como uma amostra aleatória de todos os animais que vivem na área de estudo. Se nos concentrarmos na segunda escala de habitat. seleção como definido por Johnson (1980), ou seja, a seleção da faixa de casa na área de estudo, sob a hipótese de uso de habitat aleatória, a trajetória observada poderia ter sido localizada em qualquer parte da área de estudo.
+
+Portanto, se queremos saber se a variância real de altitude poderia ter sido observada sob a hipótese de uso de habitat aleatório, uma possibilidade é  simular este tipo de habitat aleatório usando um grande número de vezes, e para calcular a variação de elevação para cada  conjunto de dados simulado. Se o valor observado está muito longe da distribuição de valores simulados, isso permitiria a descartar o modelo nulo.
+Uma possibilidade para simular este tipo de uso de habitat randomico "para este animal poderia ser  girar aleatoriamente e mudar a trajetória observada ao longo da área de estudo. Rotacionando e mudando a trajetória como um todo permite manter a estrutura trajetória inalterada (portanto, tendo em conta os constrangimentos internos. A função NMs.randomShiftRotation
+do pacote adehabitatLT  permite definir este tipo de modelo nulo (mas outros modelos nulos também estão disponíveis em adehabitatLT, e a função testNM permite simular isso.
+
+Por enquanto, vamos de nir uma função de tratamento que apenas plotar as trajetórias simuladas em um mapa de elevação. Considere a seguinte função:
+
+```{r}
+plotfun <- function(x, par)
+{
+  image(par)
+  points(x[,1:2], pch=16)
+  lines(x[,1:2])
+  return(x)
+}
+```
+
+Esta função será usada para traçar as simulações do modelo nulo. Neste caso, o argumento par corresponde a um mapa da área de estudo. Note que esta função também retorna o quadro de dados x. Agora, define o seguinte modelo nulo:
+
+```{r}
+nmo <- NMs.randomShiftRotation(na.omit(boar1), rshift = TRUE, rrot = TRUE, rx = range(xo[,1]), ry = range(xo[,2]), treatment.func = plotfun, treatment.par = puechabonsp$map[,1], nrep=9)
+nmo
+
+```
+
+Nós removemos os valores em falta a partir do objeto da classe ltraj (esta função não aceita valores faltantes na trajetória). O rshift argumentos e rrot indicam que queremos girar aleatoriamente a trajetória e transferi-lo sobre a área de estudo. A área de estudo é necessariamente um de retângulo definido por sua x e y limites rx e ry. Nós indicar que a função de tratamento é o plotfun função que acabou de escrever, e que o argumento par que será passado para a função de tratamento (ou seja, treatment.par) é o mapa de elevação. Nós apenas de multa 9 repetições do modelo nulo. Agora, nós simular o modelo usando a testNM função:
+
+
+```{r}
+set.seed(90909)
+par(mfrow=c(3,3), mar=c(0,0,0,0))
+resu <- testNM(nmo, count = FALSE)
+```
+
+Esta figura ilustra os conjuntos de dados gerados pelo modelo nulo. Podemos ver que cada conjunto de dados corresponde à trajetória original após uma rotação aleatória e deslocamento sobre a área de estudo. Em primeiro lugar, podemos ver um problema: algumas das trajetórias geradas estão localizados fora da área de estudo (porque a área de estudo é necessariamente definida como um retângulo neste tipo de modelo nulo). É aqui necessário definir uma função de restrição  quando definindo o modelo nulo. 
+Como a função de tratamento, a função de restrição leva dois argumentos x e nominal, e deve retornar um valor lógico que indica se a restrição (s) foi satisfeita ou não. No nosso exemplo, nós gostaríamos que todos os deslocamento construídos caiam em trajetórias na área de estudo. Em outras palavras, se sobrepor espacialmente os deslocamentos e o mapa de elevação, não deve haver nenhum valor em falta. Definir a seguinte função de restrição:
+
+```{r}
+confun <- function(x, par)
+{
+ ## Define a SpatialPointsDataFrame from the trajectory
+ coordinates(x) <- x[,1:2]
+ ## overlap the relocations x to the elevation map par
+ jo <- join(x, par)
+ ## checks that there are no missing value
+ res <- all(!is.na(jo)) 
+ ## return this check
+ return(res)
+}
+
+```
+
+Agora, de ne novamente o modelo nulo, mas também definir a função de restrição:
+
+```{r}
+
+nmo2 <- NMs.randomShiftRotation(na.omit(boar1), rshift = TRUE, rrot = TRUE,  rx = range(xo[,1]), ry = range(xo[,2]), treatment.func = plotfun, treatment.par = puechabonsp$map[,1], constraint.func = confun, constraint.par = puechabonsp$map[,1], nrep=9)
+
+```
+
+Agora, se nós simularmos o modelo nulo, apenas os conjuntos de dados que satisfaçam a restrição serão retornados pela função:
+
+```{r}
+set.seed(90909)
+par(mfrow=c(3,3), mar=c(0,0,0,0))
+resu <- testNM(nmo2, count = FALSE)
+```
+
+### Voltar para o problema
+Agora, considere novamente o nosso problema: é a variância dos valores de elevação com deslocamentos maiores do que o esperado sob a hipótese de utilização aleatória do espaço?
+Nós podemos escrever uma função de tratamento que calcula a variação dos valores de elevação de um x quadro de dados que contém os deslocamento e um par SpatialPixelsDataFrame contendo o mapa de elevação:
+
+```{r}
+varel <- function(x, par) {
+  coordinates(x) <- x[,1:2]
+  jo <- join(x, par)
+  return(var(jo))
+}
+
+```
+
+Podemos definir um novo modelo nulo para calcular a distribuição dos valores de variância esperada sob o modelo nulo. Usamos a função Varel como função de tratamento no modelo nulo. Para poupar algum tempo, calculamos apenas 99 valores sob este modelo nulo, mas o usuário é encorajado a tentar a função com um valor maior:
+
+
+```{r}
+nmo3 <- NMs.randomShiftRotation(na.omit(boar1), rshift = TRUE, rrot = TRUE, rx = range(xo[,1]), ry = range(xo[,2]),
+treatment.func = varel, treatment.par = puechabonsp$map[,1], constraint.func = confun, constraint.par = puechabonsp$map[,1], nrep=99)
+```
+
+Note que nós definimos a mesma função de restrição quanto antes (todas os deslocamentos devem estar localizados dentro da área de estudo. Temos agora que simular o modelo nulo.:
+
+```{r}
+sim <- testNM(nmo3, count=FALSE)
+```
+
+Agora, calcule o valor observado de variância:
+
+```{r}
+(obs <- varel(na.omit(boar1)[[1]], puechabonsp$map[,1]))
+```
+
+E comparar essa observação com a distribuição obtida no âmbito do modelo nulo, usando o as.randtest função do ade4 pacote:
+
+```{r}
+(ran <- as.randtest(unlist(sim[[1]]), obs))
+plot(ran)
+```
+
+O valor P é bastante baixo, o que parece indicar que a gama de elevações utilizada pelo javali é importante em comparação com o que seria esperado sob a hipótese de utilização de habitat aleatória.
+
+### Modelo nulo com vários animais 
+
+Agora, considere novamente o conjunto de dados puechcirc. Este conjunto de dados contém três trajetórias de dois javalis:
+
+```{r}
+puechcirc
+plot(puechcirc)
+```
+
+Note-se que as duas trajetórias de CH93 estão localizadas aproximadamente no mesmo local sobre a área de estudo. Nós decidimos vincular essas duas trajetórias em uma:
+
+```{r}
+(boar <- bindltraj(puechcirc))
+```
+
+Agora, podemos reproduzir o modelo nulo de análise separadamente para cada animal. Quando o objeto da classe ltraj passado como argumento contém várias trajetórias, as simulações são realizadas separadamente para cada um. Portanto, para definir o modelo nulo para todos os animais de javali, podemos usar a mesma linha de comando como antes, apenas substituindo boar1 por javali:
+
+```{r}
+nmo4 <- NMs.randomShiftRotation(na.omit(boar), rshift = TRUE, rrot = TRUE, rx = range(xo[,1]), ry = range(xo[,2]), treatment.func = varel, treatment.par = puechabonsp$map[,1], constraint.func = confun, constraint.par = puechabonsp$map[,1],  nrep=99)
+```
+
+Nós agora simulamos este modelo nulo com a função testNM:
+
+```{r}
+sim2 <- testNM(nmo4, count=FALSE)
+```
+
+SIM2 é uma lista com dois componentes (um por trajetória), cada componente sendo ele próprio uma lista com NREP = 99 elementos (a variância da elevação calculada para cada um dos 99 conjuntos de dados gerados pelo modelo nulo). Podemos calcular a variação da elevação observada para cada trajetória observada:
+
+```{r}
+(obs <- lapply(na.omit(boar), function(x) {varel(x, puechabonsp$map[,1]) }))
+```
+
+
+E calcular um valor de P para cada animal separadamente:
+
+```{r}
+lapply(1:2, function(i) {as.randtest(unlist(sim2[[i]]), obs[[i]])})
+```
+
+Neste caso, nenhum dos dois testes são significante no convencional  alpha = 5% nível.
+
+
+### 5.6 modelos nulos simples e modelos nulos múltiplos
+Na seção anterior, mostramos como construir um modelo nulo e simular este modelo nulo para várias trajetórias separadamente. 
+
+Agora, nós podemos encontrar mais convenientes critérios globais para (medido em todos os animais) conceber testes se a variância da elevação é maior do que o esperado sob o modelo nulo.Este é o princípio de vários modelos nulos "Esta abordagem é a seguinte:
+
+- Primeiro define um critério global que vai ser utilizado para testar a hipótese em estudo;
+
+- Defina modelos nulos individuais "utilizando qualquer uma das funções NMs * (ver abaixo), ou seja, a abordagem da randomização e as limitações que serão usados para simular uma trajetória para cada animal;
+
+- Defina um modelo nulo múltiplo de um modelo nulo único, definindo as restrições que devem ser satisfeitas para cada conjunto de trajetórias simuladas e a função de tratamento que será aplicada a cada conjunto;
+
+- Simular modelo nulo NREP vezes para obter valores NREP do critério sob o modelo nulo definido, usando a função testNM
+
+- Calcular o valor observado do critério e calcular um valor de P comparando o valor observado para a distribuição dos valores esperados sob o modelo nulo.
+
+Nós ilustramos esta abordagem no nosso exemplo. Nós primeiro definimos, como critério global, a variação média de altitude, ou seja, a variação da elevação média de todos os animais. Precisamos definir uma função de tratamento que permite calcular este critério global. A função de tratamento deve levar dois argumentos nomeados x e par. O argumento x deve ser um objeto da classe "ltraj" (ou seja, o conjunto de trajetórias simuladas pelo modelo nulo em cada etapa do processo de randomização) eo argumento par pode ser qualquer R objeto (por exemplo, uma lista) que contém os parâmetros necessários para a função de tratamento. No nosso exemplo, a função de tratamento é a seguinte:
+
+```{r}
+meanvarel <- function(x, par)
+{ livar <- lapply(x, function(y) { 
+coordinates(y) <- y[,1:2]
+jo <- join(y, par)
+return(var(jo))
+})
+
+mean(unlist(livar))
+}
+```
+
+Temos de nido os únicos modelos nulos na seção anterior. Temos agora de nir um modelo nulo múltipla a partir deste objeto usando a função NMs2NMm:
+
+```{r}
+nmo5 <- NMs2NMm(nmo4, treatment.func = meanvarel, treatment.par = puechabonsp$map, nrep = 99)
+```
+
+Note-se que tanto a função de tratamento eo número de repetições que temos de nida no NMs.randomShiftRotation função será ignorado quando o modelo nulo múltipla será simulada. Agora podemos simular o modelo:
+
+```{r}
+sim3 <- testNM(nmo5, count=FALSE)
+```
+
+Em cada etapa do processo de aleatorização, duas trajetórias são simuladas (sob o modelo nulo e que satisfaça as restrições) e a função de tratamento é aplicada às trajetórias simuladas. O resultado é, por conseguinte, uma lista com componente NREP, cada componente que contém o resultado da função de tratamento. Nós agora calculamos o critério observado:
+
+```{r}
+(obs <- meanvarel(na.omit(boar), puechabonsp$map))
+```
+
+E nós definimos um teste de aleatoriedade a partir destes resultados, usando o as.randtest função do ade4 pacote:
+
+```{r}
+(ran <- as.randtest(unlist(sim3), obs))
+plot(ran)
+```
+
+Como conclusão, não somos capazes de destacar qualquer diferença entre a variância observada e a elevação média e a distribuição dos valores esperados sob o modelo nulo.
+
+
+
+

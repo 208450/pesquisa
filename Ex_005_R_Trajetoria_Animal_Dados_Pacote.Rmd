@@ -1,0 +1,372 @@
+---
+title: "Análise de Trajetórias de Animais"
+author: "SuelaneGarcia"
+date: "21 de dezembro de 2015"
+output: html_document
+---
+##Estudando o package AdehabitatLT para análise de trajetórias de animais (Calenge et. al, 2009)
+
+Analisando trajetórias de animais...
+Neste exemplo considera-se etapas ao longo do tempo
+
+### 1. carregar os dados 
+
+```{r}
+library("adehabitatLT")
+data(puechabonsp)
+
+locs <- puechabonsp$relocs # dados de deslocamento de 4 javalis
+locs <- as.data.frame(locs)
+head(locs)
+```
+
+### 2. Usando a função strptime para converter a data
+
+#### POSIXt: classe projetada para armazenar dados de tempo em R. Esta classe armazena uma data em uma lista contendo vários elementos relacionados a esta data (dia do mês, dia da semana, o dia de o ano, mês, ano, fuso horário, hora, minuto, segundo).
+
+#### POSIXct: Esta classe armazena uma data num vector, como o número de segundos se passaram desde janeiro, 1, 1970, 1:00. Esta classe é mais conveniente para armazenar datas em um frame de dados.
+
+
+```{r}
+
+library (spacetime)
+library ("adehabitatLT")
+
+da <- as.character(locs$Date)
+head(da)
+da <- as.POSIXct(strptime(as.character(locs$Date),"%y%m%d"))
+da
+
+```
+Podemos, então, criar um objeto da classe ltraj para armazenar os movimentos de javali:
+
+#### trajetórias:
+#### Tipo I: são caracterizadas pelo fato de que o tempo não é precisamente conhecido ou não é considerado para os deslocamentos da trajetória;
+
+#### Tipo II: são caracterizadas pelo fato de que o tempo é conhecido para cada deslocamento. Este tipo de trajetória pode por sua vez é dividido em dois subtipos:
+
+#### * Regulares:  intervalo de tempo constante entre sucessivos deslocamentos.
+#### * Irregulares: intervalo de tempo variável entre os sucessivos deslocamentos.
+
+#### as.ltraj cria um objeto desta classe. 
+
+#### summary.ltraj retorna o número de deslocamentos (e valores faltantes) para cada "explosão" de deslocamento de cada animal. 
+
+### rec recalcula os parâmetros descritivos de um objeto da classe ltraj (por exemplo, após uma modificação dos conteúdos deste objeto)
+
+```{r}
+puech <- as.ltraj(xy = locs[,c("X","Y")], date = da, id = locs$Name) # coordenadas (x,y), data, id = identidade do animal
+puech
+
+```
+
+#### Parâmetros para a classe ltraj
+
+#### ** x, object = objeto da classe ltraj
+
+#### ** xy = um data.frame contendo as coordenadas x, y dos deslocamentos
+
+#### ** date = para trajetoria tipo II, um vetor da classe POSIXct dando a data de cada deslocamento. Para   trajetórias tipo I, este argumento é desconsiderado.
+
+#### ** id= uma cadeia de caracteres, indicando a identidade do animal ou um fator com comprimento igual a nrow (XY)
+
+#### ** burst = estouro ou uma cadeia de caracteres indicando a identidade da explosão de deslocamentos ou um fator com comprimento igual a nrow (xy)
+
+#### ** typeII (lógico)=  TRUE indica uma trajetória do tipo II(tempo registrado, ex. rastreamento por rádio), FALSE indica uma trajetória do tipo I (tempo não registrado, ex. amostragem de pegadas na neve)
+
+#### ** slsp = a character string used for the computation of the turning angles (see details)
+
+#### ** infolocs = Se não Nulo, um data.frame contendo informações adicionais dos deslocamentos (ex., precisão). Por padrão, uma chave primária é gerada.
+
+```
+Tem um aspecto, por exemplo, as primeiras linhas do primeiro conjunto de dados. A função as.ltraj  computou automaticamente os parâmetros descritivos das coordenadas x e y,  e a partir da data. Note que dx, dy, dist são expressas em unidades de coordenadas x, y (aqui, metros) e abs.angle, rel.angle são expressos em radianos.
+```{r}
+head(puech[[1]])
+
+```
+Um gráfico é mostrado:
+
+```{r}
+plot(puech)
+
+```
+
+Pode-se mudar um valor de coordenada 
+```{r}
+puech2 <- puech
+puech2[[1]][2,1] <- 700146
+head(puech2[[1]])
+
+```
+
+A coordenada foi alterada, mas as características da etapa estão agora incorretas.
+A função rec recalcula estas estatísticas de acordo com essas alterações:
+
+```{r}
+ head(rec(puech2)[[1]])
+
+```
+ld função permite converter rapidamente um objeto da classe ltraj a classe data.frame. Considere por exemplo o objeto Puech criado na seção anterior. Podemos converter rapidamente esse objeto para a classe data.frame:
+```{r}
+
+puech2 <- ld(puech)
+head(puech2)
+
+```
+Note-se que o quadro de dados contém todos os descritores das etapas. Além, de duas variáveis estourar e id permitem converter rapidamente esse objeto de volta para o ltraj classe, com a função dl:
+```{r}
+dl (puech2)
+
+```
+
+dl e ld podem ser utilizados para a limpeza dos dados verifica se é regular (se false não é regular)
+
+```{r}
+is.regular(puech)
+
+```
+Dê uma olhada no valor de dt de acordo com a data, usando a função plotltr. Porque dt é medido em segundos, e que não mais de um deslocamento coletado todos os dias, nós convertemos esse intervalo de tempo em dias, dividindo (por 24 horas/dia) × 3600 (segundos/hora):
+```{r}
+plotltr(puech, "dt/3600/24")
+puech
+foo <- function(dt) { return(dt> (100*3600*24)) }
+#Então, usamos a função cutltraj para cortar quaisquer ruptura de deslocamento com um valor
+#de tal forma que dt foo (dt) é verdade, em várias rajadas para o qual nenhum valor de dt
+#completos este critério:
+
+puech2 <- cutltraj(puech, "foo(dt)", nextr = TRUE)
+puech2
+burst(puech2)[3:4] <- c("Chou.1992", "Chou.1993") #Melhorando os nomes dos bursts
+
+puech2b <- puech2[c(1,2,5)]
+puech2b
+
+```
+Ou, se quisermos estudar os animais monitorados em 1993, podemos combinar isso
+com o monitoramento de Chou em 1993:
+```{r}
+puech2c <- c(puech2b, puech2[4])
+puech2c
+plot(puech2c)
+```
+
+Também é possível selecionar as explosões de acordo com seu id e seu ID de explosão.
+A função which.ltraj também pode ser utilizada para identificar as explosões que satisfaçam uma condição. Por exemplo, imagine que queremos identificar as explosões onde a distância entre deslocamentos sucessivos foi superior a 2000 metros, pelo menos, uma vez:
+
+```{r}
+bu <- which.ltraj(puech2, "dist>2000")
+bu
+```
+Este quadro de dados contém os números de identificação, ID explosao e o deslocamento que satisfaçam
+o critério específico. Podemos, então, extrair as rajadas que satisfazem este critério:
+
+```{r}
+puech2[burst(puech2)%in%bu$burst]
+```
+
+
+Os deslocamentos foram coletados diariamente, mas há muitos dias durante o quais a coleta destes deslocamentos não foi possível (tempestade, falta de trabalhadores, etc.). Nós precisamos adicionar os valores ausentes de uma trajetória regular. Para continuar, vamos usar a função setNA. Temos uma data de referência:
+
+```{r}
+refda <- strptime("00:00", "%H:%M")
+refda
+```
+
+Esta data de referência será utilizada para verificar se cada data no objeto de classe ltraj é separado a partir desta referência por um número inteiro múltiplo do DT teórica (aqui, um dia), e colocar os valores em falta nos momentos quando o deslocamento deverá, teoricamente, ser coletado. Usamos o SetNA função:
+
+```{r}
+
+puech3 <- setNA(puech2, refda, 1, units = "day")
+
+puech2
+puech3
+
+```
+Completando a temporização das trajetórias a de multa uma trajetória regular em alguns casos, apesar do fato de que a coleta do deslocamento era esperada para voltar a trajetória normal, um menor atraso é, por vezes, observado neste momento (por exemplo, o colar de GPS precisa de um tempo para deslocar). Por exemplo, considere o acompanhamento de quatro ibex nas montanhas Belledonne (Alpes franceses):
+
+```{r}
+data(ibexraw)
+ibexraw
+plotltr(ibexraw, "dt/3600")
+```
+
+Os deslocamentos deveriam ter sido coletados a cada 4 horas, mas há alguns valores faltantes. Utilizar a função SetNA para colocar os valores em falta:
+```{r}
+refda <- strptime("2003-06-01 00:00", "%Y-%m-%d %H:%M")
+ib2 <- setNA(ibexraw, refda, 4, units = "hour")
+ib2
+plotltr(ib2, "dt/3600")
+
+#arredondar a temporização
+ib3 <- sett0(ib2, refda, 4, units = "hour")
+ib3
+plot(ib3)
+
+```
+
+### 3.5 Um tipo especial de trajetórias: com mesma duração
+
+Em alguns casos, um objeto da classe ltraj contém várias explosões regulares com a mesma duração caracterizada pelos deslocamentos coletados ao mesmo tempo (mesmo defasamentos temporais entre os deslocamentos sucessivos, mesmo número de deslocamentos). Podemos verificar se um objeto da classe \ ltraj "é deste tipo com a função is.sd.  Por exemplo, considere novamente o movimento de 4 ibexes monitorado usando GPS, armazenados em um objeto da classe ltraj:
+
+```{r}
+is.sd(ib3)
+ib3
+```
+
+Isto é causado pelo fato de existirem deslocamentos em falta no início e/ou no final do acompanhamento de vários animais (A160 e A286). Nós podemos usar a função set.limits para definir o tempo de início e término das trajetórias. Essa função adiciona NAs para o início e o fim do acompanhamento, quando necessário:
+
+```{r}
+ib4 <- set.limits(ib3, begin = "2003-06-01 00:00", dur = 14, units = "day", pattern = "%Y-%m-%d %H:%M")
+ib4
+is.sd(ib4)
+
+di <- sd2df(ib4, "dist")
+head(di)
+```
+
+### 3.6 Metadados sobre as trajetórias (Precisão dos deslocamentos), etc.)
+
+Às vezes, informações adicionais estão disponíveis para cada deslocamento, e nós podemos desejar armazenar essas informações no objeto da classe ltraj, para permitir a análise das relações entre essas variáveis adicionais e os parâmetros da trajetória. Esta meta-informação pode ser armazenada em atributos infolocs de cada explosão. Isto deve ser definido ao criar o objeto ltraj, mas também pode ser definido mais tarde  Por exemplo, carregar o capreochiz conjunto de dados:
+
+```{r}
+data(capreochiz)
+head(capreochiz)
+```
+Este conjunto de dados contém os deslocamentos de um animal monitorado usando um colar GPS na floresta Chize (Deux-Sèvres, França). Este conjunto de dados contém as coordenadas X e Y (em quilômetros), a data, e diversas variáveis que caracterizam a precisão das realocações. Observe que a data já é da classe POSIXct. Nós agora definimos o objeto da classe ltraj, armazenamos as variáveis: Dop, status, Temp, ACT, Conv nos atributos infolocs do objeto:
+
+```{r}
+capreo <- as.ltraj(xy = capreochiz[,c("x","y")], date = capreochiz$date, id = "Roe.Deer", infolocs = capreochiz[,4:8])
+capreo
+
+```
+O objeto capreo pode ser gerido como de costume. A função infolocs pode ser usada para recuperar os atributos infolocs das explosões e construir uma trajetória.
+```{r}
+inf <- infolocs(capreo)
+head(inf[[1]])
+```
+
+A função removeinfo  pode ser usada para definir os atributos de todos os infolocs das explosões para NULL. Note-se que é necessário que:
+- todas as explosões sejam caracterizadas pelas mesmas variáveis nos atributos infolocs.  Por exemplo, não é possível armazenar apenas a variável Dop por uma explosão e só a variável Estado  para outra explosão em um mesmo objeto;
+- cada linha do conj. de dados armazenados como atributos infolocs corresponder a uma transferência (isto é, o número de linhas do atributo deve ser o mesmo que o número de transferência de local correspondente na explosão).
+A maioria das funções do pacote adehabitatLT fazem gerir este atributo. Por exemplo, as funções cutltraj plotltr e pode ser utilizada ligando variáveis armazenadas neste atributo (assim como muitas outras funções). Por exemplo:
+```{r}
+plotltr(capreo, "log(Dop)")
+```
+
+### 4. Analisando as trajetórias
+
+Um ponto importante é o primeiro exame da distribuição dos valores faltantes na trajetória. 
+Os valores faltantes são frequentes nas trajetórias de animais coletados usando telemetria
+(por exemplo, colar GPS pode não receber o sinal do satélite no momento do deslocamento, devido por exemplo à estrutura do habitat obscurecendo o sinal, etc.). Como observado por Graves e Waller (2006), a análise dos padrões de valores em falta deve ser parte da análise de trajetória.
+
+O pacote adehabitatLT oferece várias ferramentas para esta análise. Por exemplo, considere o objeto IB4, contendo 4 explosões que descrevem os movimentos de 4 ibexes na montanha Belledonne. 
+
+### Análise de valores faltantes
+Podemos primeiramente testar quais são os valores faltantes no monitoramento usando função runsNAltraj:
+```{r}
+runsNAltraj(ib4)
+```
+
+Considerar a distribuição dos valores em falta no caso do monitoramento de um urso marrom usando um colar GPS
+
+```{r}
+data(bear)
+bear
+```
+Essa trajetória é regular. O urso foi monitorado durante um mês, com um deslocamento a cada 30 minutos. Nós agora testamos para uma distribuição aleatória de valores faltantes para essa trajetória:
+
+```{r}
+runsNAltraj(bear)
+```
+
+Neste caso, os valores em falta não estão distribuídos de forma aleatória. Dê uma olhada na distribuição dos valores em falta:
+```{r}
+plotNAltraj(bear)
+```
+
+Devido ao elevado número de deslocamento nesta trajetória, esse gráfico não é muito claro. Então, a melhor maneira de estudar a distribuição dos valores faltantes é trabalhar diretamente sobre o vetor que indica se  os deslocamentos estão ausentes ou não.
+
+```{r}
+missval <- as.numeric(is.na(bear[[1]]$x))
+head(missval)
+
+```
+
+Este vetor pode, então, ser analisado por meio de métodos clássicos de séries temporais (por exemplo Diggle 1990). Mas este não é o objetivo deste tutorial.
+
+
+### Devemos considerar o tempo?
+Até agora, temos considerado apenas trajetórias de tipo II (tempo gravado). No entanto, uma abordagem comum para a análise dos movimentos dos animais é a de considerar o movimento como uma curva de dados discretos, e estudar as propriedades geométricas desta curva (por exemplo, Turchin 1998; Benhamou 2004). Ou seja, mesmo que a coleta de dados implique na gravação do tempo, é muitas vezes mais conveniente considerar o movimento monitorado como uma trajetória de tipo I. Existem duas formas de definir uma trajetória do tipo I com as funções de adehabitatLT. A primeira é  definir o argumento type II = false ao chamar o as.ltraj função. A segunda é usar a função typeII2typeI. Por exemplo, considerando a trajetória do urso carregado, podemos transformá-lo em um objeto tipo I (tempo não registrado):
+
+```{r}
+bearI <- typeII2typeI(bear)
+bearI #Nada mudou, exceto  que o tempo é substituído por um vetor inteiro e ordena os deslocamentos na trajetória.
+```
+
+Discretização: utilizado para expressar a individualização de uma unidade contínua em unidades individuais (discretas).
+Vários autores têm aconselhado a rediscretização de  trajetórias tipo I, de modo que elas são construídas por etapas com uma comprimento constante (por exemplo, Turchin 1998). Esta é uma abordagem conveniente para a análise, como todas as propriedades geometria da trajetória podendo ser resumida através do estudo da variação dos ângulos relativos.
+
+A função redisltraj pode ser usada para esta rediscretização Por exemplo, olhe para a trajetória do urso pardo armazenados em bearI:
+
+```{r}
+plot(bearI)
+
+```
+
+Agora, rediscretize essa trajetória com comprimento do passo constante de 500 metros:
+
+```{r}
+bearIr <- redisltraj(bearI, 500)
+bearIr
+
+```
+
+Plotar o mapa com os dados rediscretizados:
+```{r}
+plot(bearIr)
+
+```
+
+Em seguida, as propriedades geométricas podem ser estudadas examinando a distribuição dos ângulos relativos. Por exemplo, a função sliwinltr  pode ser usada para suavizar o cosseno do ângulo relativo usando um método de janela deslizante:
+
+```{r}
+sliwinltr(bearIr, function(x) mean(cos(x$rel.angle)), type="locs", step=30)
+```
+
+O início da trajetória é caracterizado por cosseno médio próximo de 0,5 (trajetória tortuosa). Em seguida, os movimentos do animal é mais linear (isto é, menos tortuosa). Uma análise  deve agora ser feita sobre estes dados. De modo que é necessário obter os ângulos relativos desta trajetória rediscretizada:
+
+```{r}
+cosrelangle <- cos(bearIr[[1]]$rel.angle)
+head(cosrelangle)
+```
+
+### Rediscretização da trajetória no tempo
+
+Uma forma comum de lidar com valores faltantes consistem em interpolação linear. dado um deslocamento R1 = (x1; y1; t1) e 
+R3 = (X3; Y3; T2), é possível estimar r2 ao deslocamento coletados no t2.
+
+Essa interpolação pode ser de valor limitado quando muitos deslocamentos estão faltando (porque supõe implicitamente que o animal está se movendo ao longo de uma linha reta). No entanto, ele pode ser útil para \ LL em "um pequeno número de mudanças de localização. Tal interpolação pode ser efetuada com a função re-disltraj, definindo o tipo de argumento =" tempo ". Neste caso, esta função rediscretiza a trajetória quando o intervalo de tempo entre sucessivos deslocamentos é constante. Por exemplo, considere o conjunto de dados porpoise:
+
+```{r}
+data(porpoise)
+porpoise
+
+```
+
+O foco são os primeiros três animais. Como contém um pequeno número de deslocamentos desaparecidos, pode ser uma boa idéia para interpolar estes deslocamentos, a fim de facilitar os cálculos posteriores. Nós primeiro removemos os valores faltantes com na.omit e, em seguida, interpolamos a trajetória que o intervalo de tempo  é constante para os sucessivos deslocamentos:
+
+```{r}
+(porpoise2 <- redisltraj(na.omit(porpoise[1:3]), 86400, type="time"))
+
+```
+O objeto porpoise2 agora não contém quaisquer valores em falta. Observe que o passo de rediscretização deve ser expresso em segundos
+
+### Exploração dinâmica de uma trajetória
+O pacote adehabitatLT fornece uma função muito útil para a exploração dinámica da circulação de animais: a função trajdyn. Esta função permite o zoom /unzoom dinamicamente, medir a distância entre várias explosões ou vários deslocamentos, explorar a trajetória no espaço e no tempo, etc. Por exemplo, oconjunto de dados é explorado pela digitação:
+
+
+
+```{r}
+trajdyn(ib4)
+```
+

@@ -1,0 +1,86 @@
+---
+title: "Análise de Trajetórias de Animais"
+author: "SuelaneGarcia"
+date: "21 de dezembro de 2015"
+output: html_document
+---
+##Estudando o package AdehabitatLT para análise de trajetórias de animais (Calenge et. al, 2009)
+
+Analisando trajetórias de animais...
+Neste exemplo considera-se etapas ao longo do tempo
+
+### 1. carregar os dados 
+
+```{r}
+
+library("adehabitatLT")
+
+
+```
+
+
+### Meu exemplo 
+```{r}
+
+##da <- as.POSIXct(da,"%y%m%d")
+##da <- as.POSIXct(da,"%Y-%m-%d %H:%M")
+
+
+library(RMySQL)
+
+conexao <- dbConnect(MySQL(),user="root", db="weka",host="localhost")
+dados <- dbReadTable(conexao, "zebras")
+dataset <- as.data.frame(dados)
+#head(dataset)
+
+#query <- dbSendQuery(conexao, "select event_id, timestamp, location_lat, location_long, #individual_taxon_canonical_name from zebras")
+
+#query <- dbSendQuery(conexao, "select event_id, timestamp, location_lat, location_long, #individual_taxon_canonical_name from zebras group by location_long, location_lat order by #timestamp, location_lat, location_long")
+
+query <- dbSendQuery(conexao, "select event_id, timestamp, location_lat, location_long, individual_taxon_canonical_name from zebras")
+
+result_consulta <- fetch(query)
+
+dataset <- result_consulta
+
+
+da <- as.character(as.Date(dataset$timestamp))
+da <- as.POSIXct(strptime(as.character(dataset$timestamp),"%Y-%m-%d %H:%M"))
+#puech <- as.ltraj(xy = dataset[,c("location_lat", "location_long")], date = da, id = #dataset$individual_taxon_canonical_name)
+
+puech <- as.ltraj(xy = dataset[,c("location_lat", "location_long")], date = da, id = dataset$individual_taxon_canonical_name)
+
+plot(puech, xlab = "Latitude", ylab = "Longitude")
+
+
+
+plotltr(puech, "dist")
+
+puech <- as.ltraj(xy = dataset[,c("location_lat", "location_long")], date = da, id = "Equus burchellii", infolocs = dataset[2])
+
+puech
+plot(puech, xlab = "Latitude", ylab = "Longitude")
+#text(dataset[,c("location_lat", "location_long")], as.character(da))
+
+#plotltr(puech)
+plotltr(puech, which = "dx")
+
+
+inf <- infolocs(puech)
+head(inf[[1]])
+
+sliwinltr(puech, function(x) mean(cos(x$rel.angle)), type="locs", step=30)
+class(puech)
+
+slotNames(puech)
+
+
+
+#dbClearResult(query)
+
+
+
+```
+
+
+
