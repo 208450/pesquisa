@@ -1,4 +1,3 @@
-# pesquisa
+# Análise de Dados
 
-
-Este espaço armazena dados sobre pesquisa em trajetórias de dados
+Este espaço armazena arquivos e documentos que compõem um processo de estudo sobre data mining e sua aplicação em trajetórias.
